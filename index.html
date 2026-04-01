@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informal Sector Relationship Network — Hyderabad</title>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --paper:    #f5f0e8;
+  --card:     #ffffff;
+  --ink:      #0f1923;
+  --blue:     #1a4a7a;
+  --blue2:    #2d6aa0;
+  --blue-l:   #dce8f5;
+  --amber:    #c9842a;
+  --amber-l:  #f5eddc;
+  --green:    #2a6644;
+  --green-l:  #e0f0e6;
+  --red:      #8b2a2a;
+  --red-l:    #f5e8e6;
+  --purple:   #4a2a7a;
+  --purple-l: #ece4f5;
+  --muted:    #7a7060;
+  --rule:     #d4c9b0;
+  --c-vend:   #1a4a7a;
+  --c-const:  #b87020;
+  --c-home:   #2a6644;
+  --c-neigh:  #4a2a7a;
+  --c-plat:   #8b2a2a;
+  --c-formal: #2a2a2a;
+}
+
+body {
+  background: var(--paper);
+  font-family: 'Figtree', sans-serif;
+  color: var(--ink);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+header {
+  padding: 12px 24px;
+  border-bottom: 1.5px solid var(--rule);
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.h-title {
+  font-family: 'Figtree', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--blue);
+}
+.h-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.h-hint {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* canvas */
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+svg { width: 100%; height: 100%; }
+
+/* edges */
+.link {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.link-label-group {
+  pointer-events: none;
+}
+
+.link-label-bg {
+  fill: rgba(245, 240, 232, 0.96);
+  stroke: rgba(212, 201, 176, 0.85);
+  stroke-width: 1;
+  rx: 7;
+  ry: 7;
+}
+
+.link-label-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  fill: var(--muted);
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+/* nodes */
+.node-group { cursor: pointer; }
+
+.node-rect {
+  rx: 16;
+  ry: 16;
+  stroke-width: 2.5;
+  transition: filter .15s;
+}
+.node-group:hover .node-rect {
+  filter: brightness(1.12) drop-shadow(0 3px 12px rgba(0,0,0,.22));
+}
+.node-group.selected .node-rect {
+  stroke-width: 4;
+  filter: drop-shadow(0 3px 14px rgba(0,0,0,.3));
+}
+
+.node-title {
+  font-family: 'Figtree', sans-serif;
+  font-weight: 700;
+  fill: #ffffff;
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+.node-tag-rect { rx: 8; ry: 8; }
+.node-tag-text {
+  font-family: 'DM Mono', monospace;
+  font-weight: 500;
+  fill: rgba(255,255,255,.85);
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* side panel */
+.panel {
+  width: 330px;
+  flex-shrink: 0;
+  border-left: 1.5px solid var(--rule);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 14px;
+  padding: 36px 28px;
+  text-align: center;
+}
+.panel-empty-icon { font-size: 28px; opacity: .35; }
+.panel-empty-text { font-size: 12.5px; color: var(--muted); line-height: 1.65; }
+.panel-body { padding: 22px 20px 36px; display: none; }
+.panel-body.show { display: block; }
+
+.p-dot {
+  display: inline-block;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: middle;
+}
+.p-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 5px;
+  line-height: 1.25;
+}
+.p-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 13px;
+}
+.p-desc {
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.7;
+  margin-bottom: 0;
+}
+.p-divider { height: 1px; background: var(--rule); margin: 16px 0; }
+.p-section {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 13px;
+}
+
+/* bars */
+.bar-row {
+  display: grid;
+  grid-template-columns: 128px 1fr 40px;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+}
+.bar-dim { font-size: 11px; color: var(--ink); font-weight: 500; line-height: 1.25; }
+.bar-track { background: #ede8de; border-radius: 3px; height: 7px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+.bar-fill.high   { width: 100%; background: var(--red); }
+.bar-fill.medium { width:  55%; background: var(--amber); }
+.bar-fill.low    { width:  18%; background: var(--green); }
+.bar-pill {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  padding: 2px 4px;
+  border-radius: 3px;
+  text-align: center;
+}
+.bar-pill.high   { background: var(--red-l);   color: var(--red); }
+.bar-pill.medium { background: var(--amber-l); color: var(--amber); }
+.bar-pill.low    { background: var(--green-l); color: var(--green); }
+
+/* connections */
+.conn-item {
+  font-size: 11.5px;
+  color: var(--ink);
+  line-height: 1.55;
+  margin-bottom: 9px;
+  padding-left: 12px;
+  position: relative;
+}
+.conn-item::before {
+  content: '›';
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+}
+
+/* legend */
+.legend {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  background: var(--card);
+  border: 1.5px solid var(--rule);
+  border-radius: 10px;
+  padding: 13px 15px;
+  min-width: 195px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.07);
+}
+.legend-ttl {
+  font-family: 'DM Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 9px;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px; font-size: 11px; color: var(--ink);
+}
+.l-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.l-rect { width: 11px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+.l-line { width: 28px; height: 2px; flex-shrink: 0; }
+.l-line.thick { height: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="h-title">Informal Sector Relationship Network — Hyderabad</div>
+    <div class="h-sub">CP192 Mini-Capstone · Daria Karmazin · 2026 · Prototype</div>
+  </div>
+  <div class="h-hint">Drag nodes · Scroll to zoom · Click to explore</div>
+</header>
+
+<div class="layout">
+  <div class="canvas-wrap">
+    <svg id="net"></svg>
+
+    <div class="legend">
+      <div class="legend-ttl">Node Types</div>
+      <div class="legend-item"><div class="l-dot" style="background:var(--c-vend)"></div>Street &amp; Mobile Vending</div>
+      <div class="legend-item"><div class="l-dot" style="background:var(--c-const)"></div>Construction &amp; Daily Wage</div>
+      <div class="legend-item"><div class="l-dot" style="background:var(--c-home)"></div>Home-Based Production</div>
+      <div class="legend-item"><div class="l-dot" style="background:var(--c-neigh)"></div>Neighbourhood Services</div>
+      <div class="legend-item"><div class="l-dot" style="background:var(--c-plat)"></div>Platform-Adjacent Work</div>
+      <div class="legend-item"><div class="l-rect" style="background:var(--c-formal)"></div>Formal Economy</div>
+      <div style="height:7px"></div>
+      <div class="legend-ttl">Edge Types</div>
+      <div class="legend-item"><div class="l-line" style="background:var(--blue2)"></div>Labor supply</div>
+      <div class="legend-item"><div class="l-line" style="background:var(--amber)"></div>Income flow</div>
+      <div class="legend-item"><div class="l-line" style="background:var(--green)"></div>Service dependency</div>
+      <div class="legend-item"><div class="l-line thick" style="background:var(--red)"></div>Surplus extraction</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-empty" id="p-empty">
+      <div class="panel-empty-icon">◎</div>
+      <div class="panel-empty-text">Click any node to explore its constraint environment profile and key connections</div>
+    </div>
+    <div class="panel-body" id="p-body"></div>
+  </div>
+</div>
+
+<script>
+// ─── NODE DEFINITIONS ────────────────────────────────────────────────────────
+const NODES = [
+  {
+    id:"formal", label:["Formal Economy"], sub:"IT · construction · retail",
+    w:100, h:46, color:"#2a2a2a", stroke:"#555",
+    tag:"Formal Sector", tagBg:"rgba(255,255,255,.12)",
+    desc:"Formally registered businesses, IT sector, construction developers, formal retail. The formal economy is structurally dependent on informal labor — a dependency rarely acknowledged in GDP measurement or policy discourse. All five informal sectors subsidize formal productivity in measurable ways.",
+    constraints: null,
+    connections:[
+      { to:"Construction & Daily Wage", type:"Extracts surplus via layered contractor chains; avoids direct employment obligations" },
+      { to:"Neighbourhood Services", type:"Formally-employed households directly employ informal domestic workers" },
+      { to:"Platform-Adjacent Work", type:"Platform companies formally registered but extract value from informally-unprotected workers" },
+      { to:"Home-Based Production", type:"Piece-rate supply chains — formal retailers benefit without acknowledging the labor source" },
+      { to:"Street & Mobile Vending", type:"Formal office workers are major customers; informal food system supports formal workforce daily" },
+    ]
+  },
+  {
+    id:"vend", label:["Street & Mobile","Vending"], sub:"Entry point · most visible",
+    w:90, h:46, color:"#1a4a7a", stroke:"#2d6aa0",
+    tag:"Entry Point", tagBg:"rgba(255,255,255,.15)",
+    desc:"Fruit and vegetable carts, chai stalls, small food vendors. Highly dependent on public space and deeply sensitive to municipal enforcement. The most visible type of informal work in Hyderabad and the primary entry point for this framework.",
+    constraints:[
+      { dim:"Admin Burden",         level:"high"   },
+      { dim:"Enforcement Uncert.",  level:"high"   },
+      { dim:"Documentation Access", level:"low"    },
+      { dim:"Mobility Friction",    level:"high"   },
+      { dim:"Flexibility Value",    level:"high"   },
+      { dim:"Visibility Risk",      level:"medium" },
+      { dim:"Social Protection",    level:"low"    },
+      { dim:"Income Volatility",    level:"high"   },
+    ],
+    connections:[
+      { to:"Construction & Daily Wage", type:"Serves daily meals to construction workers near worksites" },
+      { to:"Neighbourhood Services", type:"Shared spatial geography; overlapping customer base" },
+      { to:"Formal Economy", type:"Formally-employed households are a major customer segment" },
+      { to:"Platform-Adjacent Work", type:"Some vendors shift to delivery platforms during slow seasons" },
+    ]
+  },
+  {
+    id:"const", label:["Construction &","Daily Wage Labor"], sub:"Largest informal employer",
+    w:96, h:46, color:"#b87020", stroke:"#d49030",
+    tag:"High Migration", tagBg:"rgba(255,255,255,.15)",
+    desc:"The largest absorber of interstate migrants in Hyderabad. Layered contractor chains connect undocumented daily laborers to formally-registered developers. Workers arrive from Odisha, Bihar, and Chhattisgarh without local address documentation, which structurally blocks access to formal systems.",
+    constraints:[
+      { dim:"Admin Burden",         level:"high"   },
+      { dim:"Enforcement Uncert.",  level:"medium" },
+      { dim:"Documentation Access", level:"low"    },
+      { dim:"Mobility Friction",    level:"high"   },
+      { dim:"Flexibility Value",    level:"medium" },
+      { dim:"Visibility Risk",      level:"low"    },
+      { dim:"Social Protection",    level:"low"    },
+      { dim:"Income Volatility",    level:"high"   },
+    ],
+    connections:[
+      { to:"Formal Economy", type:"Surplus extracted via contractor chains; formal developers avoid direct employment obligations" },
+      { to:"Street & Mobile Vending", type:"Primary customer base for food vendors around worksites" },
+      { to:"Neighbourhood Services", type:"Creates downstream demand for domestic and repair services" },
+      { to:"Home-Based Production", type:"Shared accommodation creates demand for home-based food preparation" },
+    ]
+  },
+  {
+    id:"home", label:["Home-Based","Production"], sub:"Structurally undercounted",
+    w:86, h:46, color:"#2a6644", stroke:"#3a8858",
+    tag:"Invisible", tagBg:"rgba(255,255,255,.15)",
+    desc:"Tailoring, food preparation, piece-rate assembly. Structurally undercounted in all official surveys and largely invisible to data collection. Often performed by women who are not classified as economically active in official statistics, making this sector the hardest to reach empirically.",
+    constraints:[
+      { dim:"Admin Burden",         level:"low"    },
+      { dim:"Enforcement Uncert.",  level:"low"    },
+      { dim:"Documentation Access", level:"medium" },
+      { dim:"Mobility Friction",    level:"low"    },
+      { dim:"Flexibility Value",    level:"high"   },
+      { dim:"Visibility Risk",      level:"high"   },
+      { dim:"Social Protection",    level:"low"    },
+      { dim:"Income Volatility",    level:"high"   },
+    ],
+    connections:[
+      { to:"Formal Economy", type:"Piece-rate supply chains feed formal retail and garment sectors invisibly" },
+      { to:"Neighbourhood Services", type:"Role overlap — the same individual may do both; no formal distinction" },
+      { to:"Platform-Adjacent Work", type:"Some home-based producers sell via WhatsApp or Zomato" },
+    ]
+  },
+  {
+    id:"neigh", label:["Neighbourhood","Services"], sub:"Stable but unprotected",
+    w:88, h:46, color:"#4a2a7a", stroke:"#6a3aaa",
+    tag:"Relationship-Based", tagBg:"rgba(255,255,255,.13)",
+    desc:"Domestic workers, repair tradespeople, building guards, personal drivers. The most stable type of informal work — relationships are long-term and personal — yet entirely outside formal contracts or legal protection. Low visibility risk means few enforcement pressures, but zero institutional support.",
+    constraints:[
+      { dim:"Admin Burden",         level:"low"    },
+      { dim:"Enforcement Uncert.",  level:"low"    },
+      { dim:"Documentation Access", level:"medium" },
+      { dim:"Mobility Friction",    level:"low"    },
+      { dim:"Flexibility Value",    level:"medium" },
+      { dim:"Visibility Risk",      level:"low"    },
+      { dim:"Social Protection",    level:"low"    },
+      { dim:"Income Volatility",    level:"medium" },
+    ],
+    connections:[
+      { to:"Formal Economy", type:"Directly employed by formally-employed households — income flows informally, no protections" },
+      { to:"Street & Mobile Vending", type:"Customers of local vendors; shared spatial geography" },
+      { to:"Home-Based Production", type:"Role overlap — the same individual may perform both types of work" },
+    ]
+  },
+  {
+    id:"plat", label:["Platform-Adjacent","Work"], sub:"New hybrid category",
+    w:90, h:46, color:"#8b2a2a", stroke:"#b03838",
+    tag:"New Hybrid", tagBg:"rgba(255,255,255,.14)",
+    desc:"Delivery workers, ride-hailing drivers (Ola, Uber, Rapido), small digital sellers. Formally contracted but informally unprotected — the defining paradox of platform work. Platforms extract surplus while classifying workers as independent contractors to avoid labor law obligations entirely.",
+    constraints:[
+      { dim:"Admin Burden",         level:"medium" },
+      { dim:"Enforcement Uncert.",  level:"medium" },
+      { dim:"Documentation Access", level:"medium" },
+      { dim:"Mobility Friction",    level:"medium" },
+      { dim:"Flexibility Value",    level:"medium" },
+      { dim:"Visibility Risk",      level:"high"   },
+      { dim:"Social Protection",    level:"low"    },
+      { dim:"Income Volatility",    level:"high"   },
+    ],
+    connections:[
+      { to:"Formal Economy", type:"Surplus extracted by platform companies — the defining structural relationship" },
+      { to:"Street & Mobile Vending", type:"Delivery workers are customers; some vendors supply platform cloud kitchens" },
+      { to:"Construction & Daily Wage", type:"Labor pool overlap — workers shift between sectors seasonally" },
+    ]
+  }
+];
+
+const EDGES = [
+  { source:"vend",  target:"formal", type:"income",     label:"customer demand",      t:0.36, side: 1,  nudge: 4, slide: -10 },
+  { source:"const", target:"formal", type:"extraction", label:"surplus extracted",    t:0.63, side:-1,  nudge: 4, slide:   8 },
+  { source:"home",  target:"formal", type:"extraction", label:"piece-rate supply",    t:0.40, side: 1,  nudge: 3, slide:   8 },
+  { source:"neigh", target:"formal", type:"labor",      label:"domestic labor",       t:0.34, side:-1,  nudge: 3, slide: -10 },
+  { source:"plat",  target:"formal", type:"extraction", label:"platform surplus",     t:0.38, side: 1,  nudge: 3, slide:  10 },
+
+  { source:"vend",  target:"const",  type:"service",    label:"feeds workers",        t:0.42, side:-1,  nudge: 6, slide:  -8 },
+  { source:"vend",  target:"neigh",  type:"service",    label:"shared space",         t:0.41, side: 1,  nudge: 6, slide:   8 },
+  { source:"const", target:"neigh",  type:"service",    label:"downstream demand",    t:0.58, side: 1,  nudge: 7, slide:  -8 },
+  { source:"home",  target:"neigh",  type:"labor",      label:"role overlap",         t:0.48, side:-1,  nudge: 8, slide:   0 },
+  { source:"home",  target:"plat",   type:"service",    label:"digital selling",      t:0.50, side: 1,  nudge: 6, slide:   8 },
+  { source:"plat",  target:"const",  type:"labor",      label:"seasonal labor shift", t:0.34, side:-1,  nudge: 6, slide:   4 },
+  { source:"plat",  target:"vend",   type:"service",    label:"customer / supply",    t:0.52, side: 1,  nudge: 7, slide:  -8 },
+];
+
+const ECOL = { labor:"#2d6aa0", income:"#c9842a", service:"#2a6644", extraction:"#8b2a2a" };
+const EW   = { labor:2, income:2, service:1.5, extraction:3.5 };
+const EDASH= { labor:null, income:null, service:null, extraction:"7 4" };
+
+// ─── D3 SETUP ────────────────────────────────────────────────────────────────
+const svg = d3.select("#net");
+const wrap = document.querySelector(".canvas-wrap");
+let W = wrap.clientWidth, H = wrap.clientHeight;
+
+const g = svg.append("g");
+
+const zoom = d3.zoom()
+  .scaleExtent([.3,3])
+  .on("zoom", e => g.attr("transform", e.transform));
+
+svg.call(zoom);
+
+// initial view shifted more right and down
+svg.call(
+  zoom.transform,
+  d3.zoomIdentity
+    .translate(W * 0.24, H * 0.10)
+    .scale(0.74)
+);
+
+// arrow markers
+const defs = svg.append("defs");
+Object.entries(ECOL).forEach(([type, col]) => {
+  defs.append("marker").attr("id","arr-"+type)
+    .attr("viewBox","0 -5 10 10").attr("refX",10).attr("refY",0)
+    .attr("markerWidth",6).attr("markerHeight",6).attr("orient","auto")
+    .append("path").attr("d","M0,-5L10,0L0,5").attr("fill",col).attr("opacity",.8);
+});
+
+// ─── SIMULATION ──────────────────────────────────────────────────────────────
+const cx = W/2, cy = H/2;
+
+const startPos = {
+  formal: { x: cx,        y: cy        },
+  vend:   { x: cx,        y: cy - 250  },
+  plat:   { x: cx - 450,  y: cy - 70   },
+  const:  { x: cx + 500,  y: cy - 210  },
+  home:   { x: cx - 200,  y: cy + 40   },
+  neigh:  { x: cx + 310,  y: cy + 240  },
+};
+NODES.forEach(n => {
+  n.x = startPos[n.id].x;
+  n.y = startPos[n.id].y;
+});
+
+const sim = d3.forceSimulation(NODES)
+  .force("link", d3.forceLink(EDGES).id(d=>d.id)
+    .distance(d => (d.target.id==="formal"||d.source.id==="formal") ? 350 : 300)
+    .strength(0.10))
+  .force("charge", d3.forceManyBody().strength(-3200))
+  .force("center", d3.forceCenter(cx, cy).strength(0.02))
+  .force("collision", d3.forceCollide().radius(d => Math.max(d.w,d.h) + 115).strength(1))
+  .force("x", d3.forceX(cx).strength(0.016))
+  .force("y", d3.forceY(cy).strength(0.016))
+  .alphaDecay(0.010);
+
+// ─── EDGES ───────────────────────────────────────────────────────────────────
+const linkSel = g.append("g").selectAll("line").data(EDGES).join("line")
+  .attr("class","link")
+  .attr("stroke", d=>ECOL[d.type])
+  .attr("stroke-width", d=>EW[d.type])
+  .attr("stroke-dasharray", d=>EDASH[d.type])
+  .attr("marker-end", d=>`url(#arr-${d.type})`)
+  .attr("opacity", 0.65);
+
+const labelSel = g.append("g")
+  .selectAll(".link-label-group")
+  .data(EDGES)
+  .join("g")
+  .attr("class", "link-label-group");
+
+labelSel.append("rect")
+  .attr("class", "link-label-bg");
+
+labelSel.append("text")
+  .attr("class", "link-label-text")
+  .text(d => d.label);
+
+// ─── NODES ───────────────────────────────────────────────────────────────────
+const nodeSel = g.append("g").selectAll("g").data(NODES).join("g")
+  .attr("class","node-group")
+  .call(d3.drag()
+    .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
+    .on("drag", (e,d)=>{ d.fx=e.x; d.fy=e.y; })
+    .on("end",  (e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }))
+  .on("click",(e,d)=>{ e.stopPropagation(); selectNode(d); });
+
+// shadow
+nodeSel.append("rect")
+  .attr("class","node-rect")
+  .attr("x",d=>-d.w).attr("y",d=>-d.h)
+  .attr("width",d=>d.w*2).attr("height",d=>d.h*2)
+  .attr("rx",18).attr("ry",18)
+  .attr("fill","rgba(0,0,0,.15)")
+  .attr("transform","translate(3,4)")
+  .attr("stroke","none");
+
+// main rect
+nodeSel.append("rect")
+  .attr("class","node-rect")
+  .attr("x",d=>-d.w).attr("y",d=>-d.h)
+  .attr("width",d=>d.w*2).attr("height",d=>d.h*2)
+  .attr("rx",18).attr("ry",18)
+  .attr("fill",d=>d.color)
+  .attr("stroke",d=>d.stroke);
+
+// label lines
+nodeSel.each(function(d) {
+  const el = d3.select(this);
+  const lines = d.label;
+  const lh = 17;
+  const totalH = (lines.length - 1) * lh;
+  const labelTop = -totalH/2 - 6;
+
+  lines.forEach((line, i) => {
+    el.append("text")
+      .attr("class","node-title")
+      .attr("font-size","13px")
+      .attr("y", labelTop + i * lh)
+      .text(line);
+  });
+
+  el.append("text")
+    .attr("class","node-tag-text")
+    .attr("font-size","9px")
+    .attr("y", labelTop + lines.length * lh + 4)
+    .text(d.sub);
+});
+
+// deselect on bg click
+svg.on("click",()=>{
+  d3.selectAll(".node-group").classed("selected",false);
+  document.getElementById("p-empty").style.display="flex";
+  document.getElementById("p-body").classList.remove("show");
+});
+
+// ─── TICK ────────────────────────────────────────────────────────────────────
+sim.on("tick",()=>{
+  linkSel
+    .attr("x1",d=>d.source.x)
+    .attr("y1",d=>d.source.y)
+    .attr("x2",d=>edgePt(d).x)
+    .attr("y2",d=>edgePt(d).y);
+
+  labelSel.each(function(d) {
+    const t = d.t ?? 0.5;
+    const side = d.side ?? 1;
+    const nudge = d.nudge ?? 4;
+    const slide = d.slide ?? 0;
+
+    const dx = d.target.x - d.source.x;
+    const dy = d.target.y - d.source.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+    const px = d.source.x + t * dx;
+    const py = d.source.y + t * dy;
+
+    const tx = dx / len;
+    const ty = dy / len;
+    const nx = dy / len;
+    const ny = -dx / len;
+
+    const lx = px + nx * nudge * side + tx * slide;
+    const ly = py + ny * nudge * side + ty * slide;
+
+    const group = d3.select(this);
+    const text = group.select("text");
+    const rect = group.select("rect");
+
+    text
+      .attr("x", lx)
+      .attr("y", ly);
+
+    const bbox = text.node().getBBox();
+    const padX = 7;
+    const padY = 4;
+
+    rect
+      .attr("x", bbox.x - padX)
+      .attr("y", bbox.y - padY)
+      .attr("width", bbox.width + padX * 2)
+      .attr("height", bbox.height + padY * 2);
+  });
+
+  nodeSel.attr("transform",d=>`translate(${d.x},${d.y})`);
+});
+
+// shorten edge endpoint to rect boundary
+function edgePt(edge) {
+  const s=edge.source, t=edge.target;
+  const dx=t.x-s.x, dy=t.y-s.y, dist=Math.sqrt(dx*dx+dy*dy)||1;
+  const angle = Math.atan2(Math.abs(dy), Math.abs(dx));
+  const hw = t.w + 6;
+  const hh = t.h + 6;
+  const rx = hw / Math.sqrt(1 + Math.pow(Math.tan(angle) * hw/hh, 2));
+  const pad = Math.sqrt(rx*rx + Math.pow(rx*Math.tan(angle),2));
+  const r = Math.min(pad, Math.max(hw,hh)) + 8;
+  return { x: t.x - (dx/dist)*r, y: t.y - (dy/dist)*r };
+}
+
+// resize
+window.addEventListener("resize",()=>{
+  W = wrap.clientWidth;
+  H = wrap.clientHeight;
+  sim.force("center", d3.forceCenter(W/2,H/2).strength(.04));
+  sim.alpha(.15).restart();
+});
+
+// ─── PANEL ───────────────────────────────────────────────────────────────────
+function selectNode(d) {
+  d3.selectAll(".node-group").classed("selected",false);
+  d3.selectAll(".node-group").filter(n=>n.id===d.id).classed("selected",true);
+
+  document.getElementById("p-empty").style.display="none";
+  const body = document.getElementById("p-body");
+  body.classList.add("show");
+
+  let html = `
+    <div style="margin-bottom:4px">
+      <span class="p-dot" style="background:${d.color}"></span>
+    </div>
+    <div class="p-name">${d.label.join(" ")}</div>
+    <span class="p-tag" style="background:${d.color}22;color:${d.color}">${d.tag}</span>
+    <p class="p-desc">${d.desc}</p>
+    <div class="p-divider"></div>
+  `;
+
+  if (d.constraints) {
+    html += `<div class="p-section">Constraint Environment Vector</div>`;
+    d.constraints.forEach(c=>{
+      html += `
+        <div class="bar-row">
+          <div class="bar-dim">${c.dim}</div>
+          <div class="bar-track"><div class="bar-fill ${c.level}"></div></div>
+          <div class="bar-pill ${c.level}">${c.level==="medium"?"MED":c.level.toUpperCase()}</div>
+        </div>`;
+    });
+    html += `<div class="p-divider"></div>`;
+  } else {
+    html += `
+      <div class="p-section">Note on Constraint Vectors</div>
+      <p class="p-desc" style="margin-bottom:0">The formal economy does not carry a constraint vector — it represents the institutional environment that generates constraints for informal workers rather than facing them. Its central position in the network reflects its role as the primary destination for surplus extraction across all five informal sectors.</p>
+      <div class="p-divider"></div>`;
+  }
+
+  html += `<div class="p-section">Key Connections</div>`;
+  d.connections.forEach(c=>{
+    html += `<div class="conn-item"><strong>${c.to}:</strong> ${c.type}</div>`;
+  });
+
+  body.innerHTML = html;
+}
+</script>
+</body>
+</html>
